@@ -1,0 +1,88 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+import sys
+import matplotlib.ticker as mticker
+import matplotlib.patches as mpatches
+
+# --------------------------
+# Функция построения графика
+# --------------------------
+def plot_order_item_count_by_review(df: pd.DataFrame):
+    """
+    Гистограмма распределения количества товаров в заказе по типу отзывов.
+    'bad' = 1-2, 'neutral' = 3, 'good' = 4-5
+    """
+    df = df.copy()
+
+    # --- Категоризация отзывов ---
+    def label_review(score):
+        if score <= 2:
+            return "bad"
+        elif score >= 4:
+            return "good"
+        else:
+            return "neutral"
+
+    df["review_label"] = df["review_score"].apply(label_review)
+    df_plot = df[(df["review_label"] != "neutral") & (df["items_count"].notna())]
+
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(12, 6))
+
+    sns.histplot(
+        data=df_plot,
+        x="items_count",
+        hue="review_label",
+        bins=30,
+        palette={"bad": "#E74C3C", "good": "#27AE60"},
+        multiple="dodge",
+        edgecolor="#2C3E50",
+        alpha=0.8
+    )
+
+    plt.title("Order Item Count by Review Type", fontsize=16, weight="bold")
+    plt.xlabel("Number of Items in Order", fontsize=13)
+    plt.ylabel("Number of Orders", fontsize=13)
+
+    # --- Ограничение оси X ---
+    max_items = int(df_plot["items_count"].max()) + 1
+    plt.xlim(0, 7)
+
+    # --- Больше делений на оси X ---
+    plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
+    plt.gca().xaxis.set_minor_locator(mticker.MultipleLocator(1))
+
+    # --- Легенда вручную ---
+    red_patch = mpatches.Patch(color="#E74C3C", label="bad")
+    green_patch = mpatches.Patch(color="#27AE60", label="good")
+    plt.legend(handles=[red_patch, green_patch], title="Review Type", fontsize=11, title_fontsize=12)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ========================
+# Исполняемый блок
+# ========================
+if __name__ == "__main__":
+    # Добавляем src в sys.path
+    CURRENT_DIR = Path(__file__).resolve().parent
+    SRC_DIR = CURRENT_DIR.parents[3] / "src"
+    sys.path.insert(0, str(SRC_DIR))
+
+    # Импорты после sys.path
+    from analysis.init_data import read_datasets
+    from analysis.data_processing import build_feature_table
+
+    # --- Загрузка и подготовка данных ---
+    print("[RUN] Загрузка данных")
+    datasets = read_datasets()
+
+    print("[RUN] Предобработка и генерация признаков")
+    datasets = build_feature_table(datasets)
+    orders_df = datasets["orders_enriched"]
+
+    print("[RUN] Построение графика количества товаров в заказе по типу отзывов")
+    plot_order_item_count_by_review(orders_df)
